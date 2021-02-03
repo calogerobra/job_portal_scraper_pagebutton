@@ -100,7 +100,7 @@ def set_driver(webdriverpath, headless):
     Returns:
         open and maximized window of Chrome with webpage.
     """
-    options = Options()  
+    options = Options()
     if headless:
         options.add_argument("--headless")
     elif not headless:
@@ -167,7 +167,9 @@ def extract_listings_pages(first_page_html):
     """
     pc_soup = soup(first_page_html, 'html.parser')
     pc_container = pc_soup.findAll('ul', {'class': 'pagination'})[0].findAll('li', {'class': 'page-item'})
-    return [p.a['href'] for p in pc_container[2:len(pc_container)-1]]
+    maxpage = int(pc_container[len(pc_container)-2].text)
+    return ["https://www.duapune.com/search/advanced/filter?page=" + str(p) for p in range(2, maxpage+1)]
+
 
 def make_jobs_list(base_url, robust, driver):
     """ Extract item URL links and return list of all item links on web page
@@ -214,10 +216,10 @@ def make_jobs_list(base_url, robust, driver):
                     print("No links extracted", "Repeating process...")
                     on_repeat = True
                     break
-    return item_links 
+    return item_links
 
 def create_elements(object_link, verification, robust):
-    """Extracts the relevant information form the html container, i.e. object_id, 
+    """Extracts the relevant information form the html container, i.e. object_id,
     Args:
         Object URL
         verification parameter
@@ -228,8 +230,8 @@ def create_elements(object_link, verification, robust):
     object_soup = create_object_soup(object_link, verification, robust)[0]
     # Parse contents
     try:
-        company_name = object_soup.findAll('div', 
-                                           {'class': 'col-md-12 company-details'})[0].findAll('h3', 
+        company_name = object_soup.findAll('div',
+                                           {'class': 'col-md-12 company-details'})[0].findAll('h3',
                                            {'class': 'c-name'})[0].text
     except:
         company_name = ""
@@ -261,7 +263,7 @@ def create_elements(object_link, verification, robust):
         job_category = ''
     try:
         assert content_containers[1].findAll('span')[0].text == 'Tipi i punës'
-        contract_type = content_containers[1].findAll('span')[1].text 
+        contract_type = content_containers[1].findAll('span')[1].text
     except:
         contract_type = ''
     try:
@@ -271,7 +273,7 @@ def create_elements(object_link, verification, robust):
         experience_requirement = ''
     try:
         assert content_containers[3].findAll('div', {'class': 'col-xs-6'})[0].text.strip('\n') ==  'Kërkohet foto'
-        photo_requirement = content_containers[3].findAll('div', {'class': 'col-xs-6'})[1].text.strip('\n') 
+        photo_requirement = content_containers[3].findAll('div', {'class': 'col-xs-6'})[1].text.strip('\n')
     except:
         photo_requirement = ''
     try:
@@ -291,7 +293,7 @@ def create_elements(object_link, verification, robust):
     object_link = object_link
     page_html = object_soup.prettify()
     # Create a dictionary as output
-    return dict([("object_link", object_link), 
+    return dict([("object_link", object_link),
                  ("job_title", job_title),
                  ("company_name", company_name),
                  ("object_id", object_id),
@@ -308,14 +310,14 @@ def create_elements(object_link, verification, robust):
 
 def scrape_duapune(verification, robust, item_links):
     """Scraper for Duapune job portal based on specified parameters.
-    In the following we would like to extract all the containers containing 
-    the information of one listing upon revealing all items. For this purpose we try to parse through 
+    In the following we would like to extract all the containers containing
+    the information of one listing upon revealing all items. For this purpose we try to parse through
     the html text and search for all elements of interest.
     Args:
         verification parameter
         robustness parameter
         item_links object
-    Returns: 
+    Returns:
         Appended pandas dataframe with crawled content.
     """
     # Define dictionary for output
@@ -329,10 +331,10 @@ def scrape_duapune(verification, robust, item_links):
         print('Parsing URL', item_link)
         # Set scraping time
         now = datetime.datetime.now()
-        try: 
+        try:
             input_dict.update(create_elements(item_link, verification, robust))
             time.sleep(0.5)
-            # Create a dataframe   
+            # Create a dataframe
             df = pd.DataFrame(data = input_dict, index =[now])
             df.index.names = ['scraping_time']
             frames.append(df)
@@ -346,56 +348,56 @@ def scrape_duapune(verification, robust, item_links):
 def main():
     """ Note: Set parameters in this function
     """
-    # Set time stamp 
+    # Set time stamp
     now_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        
+
     # Set scraping parameters
     base_url = 'https://www.duapune.com/'
     robust = True
     webdriverpath = "C:\\Users\\Calogero\\Documents\\GitHub\\job_portal_scraper_pagebutton\\chromedriver.exe"
-    
+
     # Set up a web driver
     driver = set_driver(webdriverpath, False)
-    
+
     # Start timer
     start_time = time.time() # Capture start and end time for performance
-    
+
     # Set verification setting for certifiates of webpage. Check later also certification
     verification = True
-    
+
     # Execute functions for scraping
     start_time = time.time() # Capture start and end time for performance
     item_links = make_jobs_list(base_url, robust, driver)
     driver.close()
     appended_data = scrape_duapune(verification, robust, item_links)
-    
+
     # Split off HTML code if required
     #appended_data = appended_data.drop("page_html", 1)
-    
+
     # Write output to Excel
     print("Writing to Excel file...")
     time.sleep(1)
     output_path = 'C:\\Users\\Calogero\\Documents\\GitHub\\job_portal_scraper_pagebutton\\data\\daily_scraping\\'
-    
+
     file_name = '_'.join([output_path +
     str(now_str), 'duapune.xlsx'])
     writer = pd.ExcelWriter(file_name, engine='xlsxwriter')
     appended_data.to_excel(writer, sheet_name = 'jobs')
     writer.save()
-    
+
     # Write to CSV
     print("Writing to CSV file...")
     appended_data.to_csv(file_name.replace('.xlsx', '.csv'), sep =";",quoting=csv.QUOTE_ALL)
-    
+
     end_time = time.time()
     duration = time.strftime("%H:%M:%S", time.gmtime(end_time - start_time))
-    
+
     # For interaction and error handling
     final_text = "Your query was successful! Time elapsed:" + str(duration)
     print(final_text)
-    time.sleep(0.5) 
-        
-# Execute scraping    
+    time.sleep(0.5)
+
+# Execute scraping
 if __name__ == "__main__":
     main()
 
