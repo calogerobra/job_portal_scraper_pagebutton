@@ -101,6 +101,7 @@ def set_driver(webdriverpath, headless):
         open and maximized window of Chrome with webpage.
     """
     options = Options()
+    options.add_argument("--disable-blink-features=AutomationControlled")
     if headless:
         options.add_argument("--headless")
     elif not headless:
@@ -189,6 +190,7 @@ def make_jobs_list(base_url, robust, driver):
     while on_repeat or first_run:
         first_run = False
         open_webpage(driver, base_url)
+        time.sleep(random.randint(600, 700))
         if reveal_all_items(driver):
             # Extract first page_html
             first_page_html = driver.page_source
